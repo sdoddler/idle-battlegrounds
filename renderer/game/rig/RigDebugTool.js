@@ -1,0 +1,14 @@
+import { RigRenderer } from '../rendering/RigRenderer.js';
+import { RIG_LAYERS, blankRigOverrides } from './RigDefinition.js';
+import { ANIMATIONS } from './AnimationController.js';
+
+export class RigDebugTool {
+  constructor({host,controls,onSave}){this.host=host;this.controls=controls;this.onSave=onSave;this.app=new PIXI.Application();this.rig=null;this.overrides=blankRigOverrides();this.playing=true;this.normalized=null;}
+  async init(cosmetics, savedOverrides){await this.app.init({resizeTo:this.host,backgroundAlpha:0,antialias:true});this.host.appendChild(this.app.canvas);this.overrides=savedOverrides||blankRigOverrides();this.rig=new RigRenderer(cosmetics,this.overrides);this.rig.root.position.set(150,160);this.rig.root.scale.set(1.35);this.app.stage.addChild(this.rig.root);this.bind();this.app.ticker.add(t=>this.update(t.deltaMS/1000));}
+  bind(){const c=this.controls;c.layer.innerHTML=RIG_LAYERS.map(x=>`<option>${x}</option>`).join('');c.animation.innerHTML=Object.keys(ANIMATIONS).map(x=>`<option>${x}</option>`).join('');const refresh=()=>this.loadLayer();c.layer.onchange=refresh;c.animation.onchange=()=>{this.rig.controller.setAnimation(c.animation.value);};c.play.onclick=()=>{this.playing=!this.playing;c.play.textContent=this.playing?'Pause':'Play';};c.scrub.oninput=()=>{this.normalized=Number(c.scrub.value)/100;};for(const input of [c.x,c.y,c.r,c.sx,c.sy,c.px,c.py])input.oninput=()=>this.applyInputs();c.reset.onclick=()=>{this.overrides[c.layer.value]={x:0,y:0,r:0,sx:1,sy:1,px:0,py:0};this.loadLayer();this.persist();};c.resetAnimation.onclick=()=>{this.overrides=blankRigOverrides();this.rig.setOverrides(this.overrides);this.loadLayer();this.persist();};c.copy.onclick=async()=>{await window.desktopApi.copyText(JSON.stringify(this.overrides,null,2));c.copy.textContent='Copied';setTimeout(()=>c.copy.textContent='Copy JSON',900);};this.loadLayer();}
+  setCosmetics(c){this.rig?.setCosmetics(c);}
+  loadLayer(){const o=this.overrides[this.controls.layer.value]||{};this.controls.x.value=o.x||0;this.controls.y.value=o.y||0;this.controls.r.value=Math.round((o.r||0)*180/Math.PI);this.controls.sx.value=Math.round((o.sx??1)*100);this.controls.sy.value=Math.round((o.sy??1)*100);this.controls.px.value=o.px||0;this.controls.py.value=o.py||0;}
+  applyInputs(){const c=this.controls;this.overrides[c.layer.value]={x:Number(c.x.value),y:Number(c.y.value),r:Number(c.r.value)*Math.PI/180,sx:Number(c.sx.value)/100,sy:Number(c.sy.value)/100,px:Number(c.px.value),py:Number(c.py.value)};this.rig.setOverrides(this.overrides);this.persist();}
+  persist(){this.onSave?.(this.overrides);}
+  update(dt){if(!this.rig)return;this.rig.controller.playing=this.playing;if(this.playing)this.normalized=null;this.rig.update(dt,this.controls.animation.value,this.normalized);if(this.playing)this.controls.scrub.value=Math.round(this.rig.controller.normalizedTime()*100);}
+}

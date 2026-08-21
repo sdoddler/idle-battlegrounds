@@ -1,0 +1,38 @@
+import { Game } from './game/Game.js';
+import { MockMatchmakingProvider } from './game/platform/MockMatchmakingProvider.js';
+import { MockInventoryProvider } from './game/platform/MockInventoryProvider.js';
+import { COSMETIC_SLOTS, catalogBySlot, defaultCosmetics, itemById } from './game/data/cosmetics.js';
+import { RigDebugTool } from './game/rig/RigDebugTool.js';
+import { WEAPONS } from './game/data/weapons.js';
+
+const $=id=>document.getElementById(id); const matchmaking=new MockMatchmakingProvider(); let saved=await window.desktopApi.storeRead();
+const inventory=new MockInventoryProvider(saved.inventoryIds); let selections=saved.squadCosmetics||Array.from({length:4},()=>defaultCosmetics()); while(selections.length<4)selections.push(defaultCosmetics());
+let rigOverrides=saved.rigOverrides||null; let currentDecisionId=null;
+const game=new Game({host:$('gameHost'),onState:updateHud,onDecision:renderDecision}); await game.init();
+
+$('btnMin').onclick=()=>window.desktopApi.minimize();$('btnMax').onclick=()=>window.desktopApi.maximizeToggle();$('btnClose').onclick=()=>window.desktopApi.quit();
+$('randomSeed').onclick=()=>{$('seedInput').value=String(Date.now()).slice(-12);};
+$('playButton').onclick=async()=>{const manifest=await matchmaking.createMatch({seed:$('seedInput').value.trim()||String(Date.now())});game.start(manifest,selections);$('mainMenu').classList.add('hidden');$('hud').classList.remove('hidden');$('squadHud').classList.remove('hidden');$('eventFeed').classList.remove('hidden');closeDrawer();};
+$('hudMenu').onclick=()=>openDrawer('settings');$('drawerClose').onclick=closeDrawer;document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openDrawer(b.dataset.panel));
+
+function openDrawer(panel){$('drawer').classList.remove('hidden');for(const id of ['settingsPanel','customizePanel','rigPanel'])$(id).classList.add('hidden');$(`${panel}Panel`).classList.remove('hidden');$('drawerTitle').textContent={settings:'Desktop & Window',customize:'Squad Customisation',rig:'Rig / Asset Authoring'}[panel];if(panel==='rig')ensureRigTool();}
+function closeDrawer(){$('drawer').classList.add('hidden');}
+
+async function loadDesktop(){const d=await window.desktopApi.desktopGet();$('transparentToggle').checked=!!d.transparent;$('topToggle').checked=!!d.alwaysOnTop;$('clickToggle').checked=!!d.clickThrough;$('alphaRange').value=d.backgroundAlpha??.92;$('opacityRange').value=d.opacity??1;$('viewScaleRange').value=d.viewScale??1;$('alphaOut').value=Number($('alphaRange').value).toFixed(2);$('opacityOut').value=Number($('opacityRange').value).toFixed(2);$('viewScaleOut').value=Number($('viewScaleRange').value).toFixed(2)+'×';game.setViewScale(d.viewScale??1);game.setDesktopVisuals(d);}
+await loadDesktop();
+for(const [id,key] of [['transparentToggle','transparent'],['topToggle','alwaysOnTop'],['clickToggle','clickThrough']])$(id).onchange=async()=>{const d=await window.desktopApi.desktopSet({[key]:$(id).checked});game.setDesktopVisuals(d);};
+$('alphaRange').oninput=()=>{$('alphaOut').value=Number($('alphaRange').value).toFixed(2);window.desktopApi.desktopSet({backgroundAlpha:Number($('alphaRange').value)}).then(d=>game.setDesktopVisuals(d));};
+$('opacityRange').oninput=()=>{$('opacityOut').value=Number($('opacityRange').value).toFixed(2);window.desktopApi.desktopSet({opacity:Number($('opacityRange').value)});};
+$('viewScaleRange').oninput=()=>{const v=Number($('viewScaleRange').value);$('viewScaleOut').value=v.toFixed(2)+'×';game.setViewScale(v);window.desktopApi.desktopSet({viewScale:v});};
+
+async function persist(){await window.desktopApi.storeWrite({inventoryIds:inventory.ids(),squadCosmetics:selections,rigOverrides});}
+async function buildCustomizer(){const owned=await inventory.listOwned(),host=$('customizer');host.innerHTML='';for(let m=0;m<4;m++){const block=document.createElement('div');block.className='characterBlock';block.innerHTML=`<h3>${['Alpha','Bravo','Charlie','Delta'][m]}</h3><div class="cosmeticGrid"></div>`;const grid=block.querySelector('.cosmeticGrid');for(const slot of COSMETIC_SLOTS){const available=owned.filter(i=>i.slot===slot);if(!available.length)continue;const label=document.createElement('label');label.textContent=slot.toUpperCase();const select=document.createElement('select');for(const i of available){const o=document.createElement('option');o.value=i.itemDefId;o.textContent=`${i.name} · ${i.rarity}`;select.appendChild(o);}if(available.some(i=>i.itemDefId===selections[m][slot]))select.value=selections[m][slot];else selections[m][slot]=available[0].itemDefId;select.onchange=async()=>{selections[m][slot]=select.value;await persist();if(rigTool&&Number($('rigMember').value)===m)rigTool.setCosmetics(selections[m]);};label.appendChild(select);grid.appendChild(label);}host.appendChild(block);}await persist();}
+await buildCustomizer();
+$('mockDrop').onclick=async()=>{const item=await inventory.simulateDrop();$('dropResult').textContent=`DROP: ${item.name} (${item.rarity}) · ${item.slot}`;$('dropResult').classList.remove('hidden');await persist();await buildCustomizer();};
+
+let rigTool=null;async function ensureRigTool(){if(rigTool)return;const member=$('rigMember');member.innerHTML=['Alpha','Bravo','Charlie','Delta'].map((n,i)=>`<option value="${i}">${n}</option>`).join('');const controls={member,animation:$('rigAnimation'),layer:$('rigLayer'),play:$('rigPlay'),scrub:$('rigScrub'),x:$('rigX'),y:$('rigY'),r:$('rigR'),sx:$('rigSX'),sy:$('rigSY'),px:$('rigPX'),py:$('rigPY'),reset:$('rigReset'),resetAnimation:$('rigResetAnim'),copy:$('rigCopy')};rigTool=new RigDebugTool({host:$('rigPreview'),controls,onSave:async o=>{rigOverrides=o;await persist();}});await rigTool.init(selections[0],rigOverrides);member.onchange=()=>rigTool.setCosmetics(selections[Number(member.value)]);}
+
+function fmtTime(s){const m=Math.floor(s/60),ss=Math.floor(s%60);return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;}
+function updateHud(sim){if(!sim)return;$('aliveChars').textContent=sim.aliveCharacters();$('aliveSquads').textContent=sim.aliveSquads();$('matchTimer').textContent=fmtTime(sim.time);$('zonePhase').textContent=`RED ZONE ${sim.zone.phase+1}`;$('safeWidth').textContent=`${(sim.zone.width/1000).toFixed(1)} km`;const squad=$('squadHud');squad.innerHTML=sim.playerSquad.members.map(m=>`<div class="memberCard"><div class="memberTop"><strong>${m.name}</strong><span>${m.state}</span></div><div class="hpBar"><i style="width:${Math.max(0,m.hp)}%"></i></div><div class="memberMeta">${WEAPONS[m.weapon]?.name||m.weapon} · ${Math.round(m.hp)} HP · ${m.kills} K</div></div>`).join('');$('eventFeed').innerHTML=sim.events.slice(0,7).map(e=>`<div class="event">${escapeHtml(e.text)}</div>`).join('');}
+function renderDecision(decision){if(!decision){$('decisionHost').innerHTML='';currentDecisionId=null;return;}if(currentDecisionId===decision.id)return;currentDecisionId=decision.id;const host=$('decisionHost');host.innerHTML=`<div class="decision"><div class="decisionHead"><div><h3>${escapeHtml(decision.title)}</h3><p>${escapeHtml(decision.description)}</p></div><span class="timeout">AUTO IN ~${Math.ceil((decision.expiresTick-(game.sim?.tick||0))/10)}s</span></div><div class="decisionOptions"></div></div>`;const options=host.querySelector('.decisionOptions');for(const option of decision.options){const b=document.createElement('button');b.textContent=option.label;b.disabled=!!option.disabled;b.onclick=()=>game.choose(option.id);options.appendChild(b);}}
+function escapeHtml(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}

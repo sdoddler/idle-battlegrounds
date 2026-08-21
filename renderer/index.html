@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self';" />
+  <title>Red Zone Chibi Prototype</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header id="titlebar">
+    <div class="brand"><span class="dot"></span> RED ZONE // CHIBI PROTOTYPE</div>
+    <div class="drag-region"></div>
+    <button id="btnMin" aria-label="Minimise">—</button><button id="btnMax" aria-label="Maximise">□</button><button id="btnClose" class="danger" aria-label="Close">×</button>
+  </header>
+
+  <div id="gameShell">
+    <div id="gameHost"></div>
+
+    <div id="hud" class="hidden">
+      <div class="hudGroup"><strong id="aliveChars">100</strong><span>alive</span><strong id="aliveSquads">25</strong><span>squads</span></div>
+      <div class="hudCenter"><strong id="matchTimer">00:00</strong><span id="zonePhase">RED ZONE 1</span><span id="safeWidth">14.0 km</span></div>
+      <button id="hudMenu" class="glass">☰</button>
+    </div>
+
+    <div id="squadHud" class="hidden"></div>
+    <div id="eventFeed" class="hidden"></div>
+    <div id="decisionHost"></div>
+
+    <section id="mainMenu" class="overlay menuCard">
+      <div class="eyebrow">DETERMINISTIC SQUAD BATTLE ROYALE</div>
+      <h1>Your squad. Their ghosts.<br/>One shared seed.</h1>
+      <p>25 squads enter the same generated match. You influence four chibi operators through small decisions while movement and combat resolve automatically.</p>
+      <div class="seedRow"><input id="seedInput" value="123901830981" spellcheck="false" /><button id="randomSeed">Randomise</button></div>
+      <button id="playButton" class="primary big">PLAY BOT LOBBY</button>
+      <div class="menuActions"><button data-panel="customize">Squad</button><button data-panel="settings">Desktop</button><button data-panel="rig">Rig Debug</button></div>
+      <div class="tiny">Mock matchmaking: 24 deterministic bot squads + your squad, launches instantly.</div>
+    </section>
+
+    <aside id="drawer" class="drawer hidden">
+      <div class="drawerHead"><div><span class="eyebrow" id="drawerEyebrow">DEVELOPMENT</span><h2 id="drawerTitle">Panel</h2></div><button id="drawerClose">×</button></div>
+      <div id="settingsPanel" class="panelPage hidden">
+        <label class="toggle"><input id="transparentToggle" type="checkbox" /><span>Transparent desktop background</span></label>
+        <label class="toggle"><input id="topToggle" type="checkbox" /><span>Always on top</span></label>
+        <label class="toggle"><input id="clickToggle" type="checkbox" /><span>Click-through window</span></label>
+        <label>Background alpha <output id="alphaOut">0.92</output><input id="alphaRange" type="range" min="0" max="1" step="0.05" value="0.92" /></label>
+        <label>Window opacity <output id="opacityOut">1.00</output><input id="opacityRange" type="range" min="0.4" max="1" step="0.05" value="1" /></label>
+        <label>Game view scale <output id="viewScaleOut">1.00×</output><input id="viewScaleRange" type="range" min="0.7" max="1.5" step="0.05" value="1" /></label>
+        <p class="muted">Transparency affects the Electron window; Pixi retains a transparent canvas and responsive logical camera.</p>
+      </div>
+      <div id="customizePanel" class="panelPage hidden">
+        <div class="subRow"><p>Each squad member uses the same animation rig with independent cosmetic layer IDs.</p><button id="mockDrop">Simulate free drop</button></div>
+        <div id="dropResult" class="dropResult hidden"></div><div id="customizer"></div>
+      </div>
+      <div id="rigPanel" class="panelPage hidden">
+        <div class="rigLayout"><div id="rigPreview"></div><div class="rigControls">
+          <label>Member <select id="rigMember"></select></label><label>Animation <select id="rigAnimation"></select></label><div class="inline"><button id="rigPlay">Pause</button><label class="grow">Scrub<input id="rigScrub" type="range" min="0" max="100" value="0" /></label></div>
+          <label>Layer <select id="rigLayer"></select></label>
+          <div class="grid2"><label>X<input id="rigX" type="number" value="0" /></label><label>Y<input id="rigY" type="number" value="0" /></label><label>Rotation °<input id="rigR" type="number" value="0" /></label><label>Scale X %<input id="rigSX" type="number" value="100" /></label><label>Scale Y %<input id="rigSY" type="number" value="100" /></label><label>Pivot X<input id="rigPX" type="number" value="0" /></label><label>Pivot Y<input id="rigPY" type="number" value="0" /></label></div>
+          <div class="inline"><button id="rigReset">Reset layer</button><button id="rigResetAnim">Reset all</button><button id="rigCopy">Copy JSON</button></div>
+        </div></div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="../node_modules/pixi.js/dist/pixi.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
