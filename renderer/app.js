@@ -5,8 +5,8 @@ import { COSMETIC_SLOTS, catalogBySlot, defaultCosmetics, itemById } from './gam
 import { RigDebugTool } from './game/rig/RigDebugTool.js';
 import { WEAPONS } from './game/data/weapons.js';
 
-const $=id=>document.getElementById(id); const matchmaking=new MockMatchmakingProvider(); let saved=await window.desktopApi.storeRead();
-const inventory=new MockInventoryProvider(saved.inventoryIds); let selections=saved.squadCosmetics||Array.from({length:4},()=>defaultCosmetics()); while(selections.length<4)selections.push(defaultCosmetics());
+const $=id=>document.getElementById(id); const matchmaking=new MockMatchmakingProvider(); const stored=await window.desktopApi.storeRead(); const saved=stored&&typeof stored==='object'?stored:{};
+const inventory=new MockInventoryProvider(Array.isArray(saved.inventoryIds)?saved.inventoryIds:undefined); let selections=Array.isArray(saved.squadCosmetics)?saved.squadCosmetics.slice(0,4):[]; while(selections.length<4)selections.push(defaultCosmetics()); selections=selections.map(value=>value&&typeof value==='object'?{...defaultCosmetics(),...value}:defaultCosmetics());
 let rigOverrides=saved.rigOverrides||null; let currentDecisionId=null;
 const game=new Game({host:$('gameHost'),onState:updateHud,onDecision:renderDecision}); await game.init();
 

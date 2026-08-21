@@ -53,6 +53,13 @@ function applyDesktopState() {
   try { mainWindow.setBackgroundColor(d.transparent ? '#00000000' : alphaColor(d.backgroundAlpha ?? 0.92)); } catch {}
   mainWindow.webContents.send('desktop:changed', d);
 }
+async function disableClickThrough() {
+  if (!store.desktop?.clickThrough) return;
+  store.desktop.clickThrough = false;
+  try { await writeJson(storePath, store); }
+  catch (err) { console.warn('Click-through recovery save failed', err); }
+  applyDesktopState();
+}
 function scheduleWindowStateWrite() {
   clearTimeout(stateWriteTimer);
   stateWriteTimer = setTimeout(async () => {
@@ -83,6 +90,17 @@ async function createWindow() {
       sandbox: true
     }
   });
+  // A click-through window cannot be clicked to turn click-through back off.
+  // Keep an accessible keyboard escape hatch even if it is enabled mid-session.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape' && store.desktop?.clickThrough) {
+      event.preventDefault();
+      disableClickThrough();
+    }
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('Renderer process exited unexpectedly', details);
+  });
   await mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('resize', scheduleWindowStateWrite);
   mainWindow.on('move', scheduleWindowStateWrite);
@@ -100,6 +118,8 @@ app.whenReady().then(async () => {
   storePath = path.join(app.getPath('userData'), 'prototype-state.json');
   windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
   store = deepMerge(defaults, await readJson(storePath, {}));
+  // Never launch into an unclickable window. Click-through is session-only.
+  store.desktop.clickThrough = false;
   windowState = await readJson(windowStatePath, {});
 
   ipcMain.handle('store:read', () => store);
