@@ -71,6 +71,8 @@
   </div>
 
   <script src="../node_modules/pixi.js/dist/pixi.min.js"></script>
+  <!-- Pixi's CSP-safe runtime replacements must install before Application.init(). -->
+  <script src="../node_modules/pixi.js/dist/packages/unsafe-eval.min.js"></script>
   <script type="module" src="./bootstrap.js"></script>
 </body>
 </html>
