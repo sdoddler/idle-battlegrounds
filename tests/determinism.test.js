@@ -45,3 +45,15 @@ test('decision system auto-resolves ignored choices',()=>{
   assert.equal(sim.decisions.history[0].option,'safe');
   assert.equal(sim.decisions.history[0].timedOut,true);
 });
+
+test('squad members keep independent positions and downed members stay where they fell',()=>{
+  const sim=new MatchSimulation(createMatchManifest('independent-movement'));
+  const squad=sim.playerSquad;
+  for(let i=0;i<20;i++)sim.step();
+  assert.ok(new Set(squad.aliveMembers.map(m=>m.offsetX.toFixed(1))).size>1);
+  const member=squad.members[0];
+  member.knock(sim.tick);
+  const fallX=squad.x+member.offsetX;
+  for(let i=0;i<10;i++)sim.step();
+  assert.ok(Math.abs((squad.x+member.offsetX)-fallX)<0.001);
+});

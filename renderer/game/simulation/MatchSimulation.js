@@ -61,12 +61,27 @@ export class MatchSimulation {
     else this.updatePlayerAutoRoute(squad);
     const baseSpeed=squad.profile==='survival'?44:squad.profile==='aggressive'?58:50;
     const boost=squad.boostUntil>this.tick?1.18:1; const speed=baseSpeed*squad.speedMultiplier*boost;
+    const previousX=squad.x;
     squad.x=Math.max(0,Math.min(CONFIG.WORLD_LENGTH,squad.x+Math.sign(squad.targetX-squad.x)*speed*CONFIG.TICK_SECONDS));
+    this.updateMemberMovement(squad,squad.x-previousX);
     this.vehicleSystem.updateSquadVehicle(squad);
     const poi=this.lootSystem.nearestPOI(squad.x);
     if(Math.abs(poi.x-squad.x)<70&&!squad.visitedPOIs.has(poi.id))this.arriveAtPOI(squad,poi);
     if(squad.id===0)this.maybeOfferContactDecision(squad); else this.botTactics(squad);
     this.setStances(squad);
+  }
+  updateMemberMovement(squad,squadDelta){
+    const inContact=this.nearbyEnemies(squad,950).length>0;
+    for(let i=0;i<squad.members.length;i++){
+      const member=squad.members[i];
+      // Incapacitated members remain where they fell while their team can move on.
+      if(member.state==='downed'){member.offsetX-=squadDelta;continue;}
+      if(member.state==='dead')continue;
+      const column=(i-1.5)*(inContact?76:54);
+      const initiative=inContact?Math.sin((this.tick+i*17+squad.id*11)*.045)*28:Math.sin((this.tick+i*23+squad.id*7)*.025)*18;
+      const desired=column+initiative+(squad.profile==='aggressive'&&inContact?(i%2?26:-12):0);
+      member.offsetX+=(desired-member.offsetX)*.12;
+    }
   }
   updatePlayerAutoRoute(squad){
     const outside=squad.x<this.zone.left+150||squad.x>this.zone.right-150;
@@ -79,6 +94,13 @@ export class MatchSimulation {
   arriveAtPOI(squad,poi){
     squad.visitedPOIs.add(poi.id); const loot=this.lootSystem.lootFor(poi.id,squad.id,squad.visitedPOIs.size);
     if(squad.id===0){
+      // Routine scavenging is automatic. Only interrupt for occasional loadout
+      // moments where the player can make a meaningful change.
+      if(squad.visitedPOIs.size%3!==0){
+        const member=squad.aliveMembers.sort((a,b)=>a.ammo-b.ammo)[0];
+        if(member){member.ammo=Math.min(member.ammo+Math.ceil(WEAPONS[member.weapon].ammo*.35),WEAPONS[member.weapon].ammo);member.armour=Math.min(100,member.armour+loot.armour*.45);}
+        return;
+      }
       if(!this.decisions.hasType('loot'))this.decisions.offer({id:`loot-${poi.id}-${this.tick}`,type:'loot',title:`Search ${poi.name}`,description:'Choose one quick pickup while the squad keeps moving.',context:{poiId:poi.id},defaultOption:'skip',options:[
         {id:'weaponA',label:`Take ${WEAPONS[loot.weapons[0]].name}`,effect:{kind:'equipWeapon',weapon:loot.weapons[0]}},
         {id:'weaponB',label:`Take ${WEAPONS[loot.weapons[1]].name}`,effect:{kind:'equipWeapon',weapon:loot.weapons[1]}},
@@ -86,7 +108,7 @@ export class MatchSimulation {
         {id:'skip',label:'Keep moving',effect:{kind:'noop'}}
       ]},this.tick);
       const vehicle=this.vehicleSystem.availableNear(squad.x,95); if(vehicle&&!this.decisions.hasType('vehicle'))this.offerVehicleDecision(vehicle);
-      if(squad.visitedPOIs.size%3===0&&!this.decisions.hasType('route'))this.offerRouteDecision(squad,poi);
+      if(squad.visitedPOIs.size%5===0&&!this.decisions.hasType('route'))this.offerRouteDecision(squad,poi);
     } else {
       const weapon=this.botBrain.chooseLoot(squad,loot); const member=squad.aliveMembers.sort((a,b)=>(WEAPONS[a.weapon].damage/WEAPONS[a.weapon].fireInterval)-(WEAPONS[b.weapon].damage/WEAPONS[b.weapon].fireInterval))[0];
       if(member){member.secondary=member.weapon;member.weapon=weapon;member.ammo=WEAPONS[weapon].ammo;member.armour+=loot.armour;member.utilities[loot.utility]=(member.utilities[loot.utility]||0)+1;}
@@ -110,7 +132,7 @@ export class MatchSimulation {
   }
   nearbyEnemies(squad,distance=850){return this.squads.filter(s=>s.id!==squad.id&&!s.isEliminated&&Math.abs(s.x-squad.x)<distance);}
   maybeOfferContactDecision(squad){
-    if(this.tick-squad.lastContactDecisionTick<120||this.decisions.hasType('contact'))return;
+    if(this.tick-squad.lastContactDecisionTick<300||this.decisions.hasType('contact'))return;
     const enemies=this.nearbyEnemies(squad,850); if(!enemies.length)return;
     squad.lastContactDecisionTick=this.tick;
     const hasSmoke=squad.members.some(m=>m.state==='alive'&&m.utilities.smoke>0), hasFrag=squad.members.some(m=>m.state==='alive'&&m.utilities.frag>0), hasBarrier=squad.members.some(m=>m.state==='alive'&&m.utilities.barrier>0), hasMedkit=squad.members.some(m=>m.state==='alive'&&m.utilities.medkit>0), hasBoost=squad.members.some(m=>m.state==='alive'&&m.utilities.boost>0);
