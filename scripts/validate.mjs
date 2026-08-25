@@ -16,5 +16,11 @@ for(const file of files.filter(f=>f.endsWith('.js')||f.endsWith('.mjs'))){
 }
 
 const simulationFiles=files.filter(f=>f.includes(`${path.sep}simulation${path.sep}`));for(const file of simulationFiles){const text=fs.readFileSync(file,'utf8');if(/Math\.random\s*\(/.test(text))throw new Error(`Math.random used in simulation: ${path.relative(root,file)}`);}
-const html=fs.readFileSync(path.join(root,'renderer/index.html'),'utf8');if(!html.includes('../node_modules/pixi.js/dist/pixi.min.js'))throw new Error('PixiJS runtime path is not the expected standalone path');
+const html=fs.readFileSync(path.join(root,'renderer/index.html'),'utf8');
+const pixiScript='../node_modules/pixi.js/dist/pixi.min.js';
+const cspSafeScript='../node_modules/pixi.js/dist/packages/unsafe-eval.min.js';
+if(!html.includes(pixiScript))throw new Error('PixiJS runtime path is not the expected standalone path');
+if(!html.includes(cspSafeScript))throw new Error('PixiJS CSP-safe runtime module is missing');
+if(html.indexOf(cspSafeScript)<html.indexOf(pixiScript))throw new Error('PixiJS CSP-safe runtime module must load after PixiJS');
+if(html.indexOf(cspSafeScript)>html.indexOf('./bootstrap.js'))throw new Error('PixiJS CSP-safe runtime module must load before the application bootstrap');
 console.log(`Validation OK: ${files.length} JS files syntax-checked; simulation contains no Math.random().`);

@@ -61,9 +61,18 @@
         </div></div>
       </div>
     </aside>
+
+    <section id="bootError" class="overlay bootError hidden" role="alert">
+      <div class="eyebrow">STARTUP ERROR</div>
+      <h2>The game could not finish loading</h2>
+      <p data-error-message>An unexpected error occurred.</p>
+      <p class="muted">Restart the app. If the problem remains, run <code>npm install</code> and check the terminal output.</p>
+    </section>
   </div>
 
   <script src="../node_modules/pixi.js/dist/pixi.min.js"></script>
-  <script type="module" src="./app.js"></script>
+  <!-- Pixi's CSP-safe runtime replacements must install before Application.init(). -->
+  <script src="../node_modules/pixi.js/dist/packages/unsafe-eval.min.js"></script>
+  <script type="module" src="./bootstrap.js"></script>
 </body>
 </html>
