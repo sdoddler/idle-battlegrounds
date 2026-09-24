@@ -2,6 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import { createMatchManifest } from '../renderer/game/simulation/MatchManifest.js';
 import { MatchSimulation } from '../renderer/game/simulation/MatchSimulation.js';
 import { CONFIG } from '../renderer/game/config.js';
+import { VehicleSystem } from '../renderer/game/simulation/VehicleSystem.js';
 
 function runSteps(seed,steps,decisionEffect=null){const sim=new MatchSimulation(createMatchManifest(seed));if(decisionEffect)sim.applyDecisionEffect(decisionEffect);for(let i=0;i<steps&&sim.running;i++)sim.step();return sim.checksumState();}
 
@@ -56,4 +57,29 @@ test('squad members keep independent positions and downed members stay where the
   const fallX=squad.x+member.offsetX;
   for(let i=0;i<10;i++)sim.step();
   assert.ok(Math.abs((squad.x+member.offsetX)-fallX)<0.001);
+});
+
+test('opening deployment spreads squads and delays combat',()=>{
+  const sim=new MatchSimulation(createMatchManifest('calm-opening'));
+  const positions=sim.squads.map(s=>s.x).sort((a,b)=>a-b);
+  assert.ok(positions.slice(1).every((x,i)=>x-positions[i]>500));
+  for(let i=0;i<CONFIG.COMBAT_GRACE_TICKS-1;i++)sim.step();
+  assert.equal(sim.squads.some(s=>s.members.some(m=>m.damage>0)),false);
+});
+
+test('queued decisions receive a full timeout after becoming active',()=>{
+  const sim=new MatchSimulation(createMatchManifest('decision-queue'));
+  const decision=id=>({id,type:'test',title:id,description:id,timeoutTicks:3,defaultOption:'ok',options:[{id:'ok',label:'OK',effect:{kind:'noop'}}]});
+  sim.decisions.offer(decision('first'),sim.tick);sim.decisions.offer(decision('second'),sim.tick);
+  for(let i=0;i<3;i++)sim.step();
+  assert.equal(sim.decisions.active.id,'second');
+  assert.equal(sim.decisions.active.expiresTick,sim.tick+3);
+});
+
+test('a vehicle claimed by squad zero cannot be claimed again',()=>{
+  const system=new VehicleSystem({pois:[{id:1,x:100,hasVehicle:true}]});
+  const player={id:0,vehicle:null},rival={id:1,vehicle:null};
+  assert.equal(system.claim(system.vehicles[0],player),true);
+  assert.equal(system.availableNear(100),null);
+  assert.equal(system.claim(system.vehicles[0],rival),false);
 });

@@ -17,7 +17,7 @@ const defaults = {
     alwaysOnTop: false,
     clickThrough: false,
     opacity: 1,
-    viewScale: 1
+    viewScale: 0.85
   }
 };
 

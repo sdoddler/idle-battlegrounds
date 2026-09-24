@@ -21,7 +21,8 @@ export class RedZone {
     }
   }
   stateAt(timeSeconds) {
-    const raw = Math.max(0, Math.min(5.9999, timeSeconds / this.phaseDuration));
+    const openingSeconds=CONFIG.COMBAT_GRACE_TICKS*CONFIG.TICK_SECONDS;
+    const raw = Math.max(0, Math.min(5.9999, (timeSeconds-openingSeconds) / this.phaseDuration));
     const phase = Math.floor(raw);
     const t = smoothstep(raw-phase);
     const a=this.keyframes[phase], b=this.keyframes[phase+1];

@@ -14,13 +14,13 @@ import { CombatSystem } from './CombatSystem.js';
 
 export class MatchSimulation {
   constructor(manifest,{playerCosmetics=[]}={}) {
-    this.manifest=manifest; this.seed=manifest.seed; this.tick=0; this.time=0; this.running=true; this.events=[];
+    this.manifest=manifest; this.seed=manifest.seed; this.tick=0; this.time=0; this.running=true; this.events=[];this.visualEvents=[];
     this.redZoneSystem=new RedZone(this.seed); this.zone=this.redZoneSystem.stateAt(0);
     this.lootSystem=new LootSystem(this.seed); this.vehicleSystem=new VehicleSystem(this.lootSystem);
-    this.utilitySystem=new UtilitySystem(this.seed); this.decisions=new DecisionSystem(CONFIG.DECISION_TIMEOUT_TICKS);
+    this.utilitySystem=new UtilitySystem(this.seed,(effect)=>this.addVisualEffect(effect)); this.decisions=new DecisionSystem(CONFIG.DECISION_TIMEOUT_TICKS);
     this.botBrain=new BotBrain(this.seed,this.lootSystem); this.squads=[]; this.pendingPlayerRevives=new Set();
     this.spawnSquads(playerCosmetics);
-    this.combatSystem=new CombatSystem(this.seed,this.utilitySystem,(text)=>this.emit(text));
+    this.combatSystem=new CombatSystem(this.seed,this.utilitySystem,(text)=>this.emit(text),(effect)=>this.addVisualEffect(effect));
     this.emit(`Match ${manifest.matchId} started`);
   }
   spawnSquads(playerCosmetics){
@@ -38,20 +38,22 @@ export class MatchSimulation {
     }
   }
   initialTarget(squad){
-    const rng=stream(this.seed,'INITIAL_ROUTE',squad.id); const viable=this.lootSystem.pois.filter(p=>Math.abs(p.x-squad.x)>180);
+    const rng=stream(this.seed,'INITIAL_ROUTE',squad.id); const viable=this.lootSystem.pois.filter(p=>Math.abs(p.x-squad.x)>180).sort((a,b)=>Math.abs(a.x-squad.x)-Math.abs(b.x-squad.x)).slice(0,4);
     return pick(rng,viable).x;
   }
   get playerSquad(){return this.squads[CONFIG.PLAYER_SQUAD_ID];}
   aliveCharacters(){return this.squads.reduce((n,s)=>n+s.existingMembers.length,0);}
   aliveSquads(){return this.squads.filter(s=>!s.isEliminated).length;}
   emit(text){this.events.unshift({tick:this.tick,text});this.events=this.events.slice(0,12);}
+  addVisualEffect(effect){this.visualEvents.push({...effect,tick:this.tick});this.visualEvents=this.visualEvents.filter(e=>this.tick-e.tick<18).slice(-80);}
   step(){
     if(!this.running)return;
     this.tick++; this.time=this.tick*CONFIG.TICK_SECONDS; this.zone=this.redZoneSystem.stateAt(this.time);
+    this.visualEvents=this.visualEvents.filter(e=>this.tick-e.tick<18);
     const timedOut=this.decisions.update(this.tick); if(timedOut)this.applyDecisionResult(timedOut);
     this.utilitySystem.update(this.tick);
     for(const squad of this.squads) this.updateSquad(squad);
-    this.combatSystem.update(this.squads,this.tick,CONFIG.TICK_SECONDS);
+    if(this.tick>=CONFIG.COMBAT_GRACE_TICKS)this.combatSystem.update(this.squads,this.tick,CONFIG.TICK_SECONDS);else for(const squad of this.squads)squad.engagedSquadId=null;
     this.updateDowned(); this.applyZoneDamage();
     if(this.time>=CONFIG.MATCH_SECONDS||this.aliveSquads()<=1){this.running=false;this.emit('Match complete');}
   }
@@ -77,8 +79,8 @@ export class MatchSimulation {
       // Incapacitated members remain where they fell while their team can move on.
       if(member.state==='downed'){member.offsetX-=squadDelta;continue;}
       if(member.state==='dead')continue;
-      const column=(i-1.5)*(inContact?76:54);
-      const initiative=inContact?Math.sin((this.tick+i*17+squad.id*11)*.045)*28:Math.sin((this.tick+i*23+squad.id*7)*.025)*18;
+      const column=(i-1.5)*(inContact?150:118);
+      const initiative=inContact?Math.sin((this.tick+i*17+squad.id*11)*.045)*42:Math.sin((this.tick+i*23+squad.id*7)*.025)*28;
       const desired=column+initiative+(squad.profile==='aggressive'&&inContact?(i%2?26:-12):0);
       member.offsetX+=(desired-member.offsetX)*.12;
     }
@@ -160,7 +162,7 @@ export class MatchSimulation {
     }
   }
   setStances(squad){
-    const contact=this.nearbyEnemies(squad,900).length>0;
+    const contact=squad.engagedSquadId!=null;
     for(const m of squad.members){if(m.state!=='alive')continue;if(contact)m.stance=squad.profile==='survival'?'proneShoot':squad.profile==='balanced'?'crouchShoot':'shoot';else m.stance=squad.vehicle?'idle':Math.abs(squad.targetX-squad.x)>90?'run':'idle';}
   }
   chooseDecision(optionId){const result=this.decisions.choose(optionId,this.tick);if(result)this.applyDecisionResult(result);return result;}

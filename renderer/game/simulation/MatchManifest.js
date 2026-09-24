@@ -10,9 +10,11 @@ export function createMatchManifest(seed, playerName='PLAYER') {
     const rng = stream(cleanSeed, 'SQUAD', s);
     squads.push({
       id:s,
-      name:s===0 ? `${playerName} SQUAD` : `GHOST SQUAD ${String(s).padStart(2,'0')}`,
+      name:s===0 ? `${playerName} SQUAD` : `RIVAL ${String(s).padStart(2,'0')}`,
       profile:s===0 ? 'balanced' : pick(rng, PROFILES),
-      spawnX:range(rng, 500, CONFIG.WORLD_LENGTH-500),
+      // Even sectors prevent several squads spawning on top of one another while
+      // jitter keeps openings from feeling identical.
+      spawnX:Math.max(550,Math.min(CONFIG.WORLD_LENGTH-550,(s+.5)*(CONFIG.WORLD_LENGTH/CONFIG.SQUAD_COUNT)+range(rng,-180,180))),
       members:Array.from({length:CONFIG.MEMBERS_PER_SQUAD}, (_,m)=>({
         id:`${s}:${m}`,
         name:s===0 ? ['Alpha','Bravo','Charlie','Delta'][m] : `G${s}-${m+1}`,

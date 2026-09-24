@@ -5,7 +5,7 @@ A standalone Electron + PixiJS 8 prototype for a deterministic 2D side-scrolling
 ## What the prototype demonstrates
 
 - 25 squads × 4 characters = 100 simulated characters.
-- One local human squad; 24 deterministic ghost/bot squads.
+- One local human squad; 24 deterministic rival bot squads.
 - Versioned `MatchManifest` and namespaced seeded PRNG streams.
 - Fixed 100 ms simulation tick independent of renderer FPS.
 - Deterministic POIs, loot, bot routes, zone movement, combat and utility outcomes.

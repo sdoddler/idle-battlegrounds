@@ -5,7 +5,7 @@ import { stream, range, weighted, chance } from './PRNG.js';
 export class LootSystem {
   constructor(seed) { this.seed=seed; this.pois=this.generateWorld(); }
   generateWorld() {
-    const pois=[]; const count=30; const spacing=(CONFIG.WORLD_LENGTH-700)/(count-1);
+    const pois=[]; const count=48; const spacing=(CONFIG.WORLD_LENGTH-700)/(count-1);
     for (let i=0;i<count;i++) {
       const rng=stream(this.seed,'WORLD','POI',i);
       const type=POI_TYPES[i%POI_TYPES.length];

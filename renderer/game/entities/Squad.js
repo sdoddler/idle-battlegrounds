@@ -3,6 +3,7 @@ export class Squad {
     this.id = id; this.name = name; this.profile = profile; this.x = x; this.targetX = x;
     this.members = members; this.vehicle = null; this.visitedPOIs = new Set();
     this.lastDecisionTick = -9999; this.lastContactDecisionTick = -9999;
+    this.engagedSquadId = null;
     this.smokeUntil = 0; this.boostUntil = 0; this.barrierUntil = 0;
   }
   get aliveMembers() { return this.members.filter(m => m.state === 'alive'); }

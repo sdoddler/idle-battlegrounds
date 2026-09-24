@@ -1,9 +1,9 @@
 export class DecisionSystem {
   constructor(timeoutTicks=70) { this.timeoutTicks=timeoutTicks; this.queue=[]; this.active=null; this.history=[]; }
+  activate(decision,tick) { return {...decision,createdTick:tick,expiresTick:tick+(decision.timeoutTicks||this.timeoutTicks)}; }
   offer(decision, tick) {
-    const normalized={...decision, createdTick:tick, expiresTick:tick+(decision.timeoutTicks||this.timeoutTicks)};
-    if (!this.active) this.active=normalized; else this.queue.push(normalized);
-    return normalized.id;
+    if (!this.active) this.active=this.activate(decision,tick); else this.queue.push({...decision});
+    return decision.id;
   }
   hasType(type) { return this.active?.type===type || this.queue.some(d=>d.type===type); }
   choose(optionId, tick) {
@@ -11,7 +11,7 @@ export class DecisionSystem {
     const option=this.active.options.find(o=>o.id===optionId && !o.disabled) || this.active.options.find(o=>o.id===this.active.defaultOption) || this.active.options.find(o=>!o.disabled);
     const result={decision:this.active, option, tick, timedOut:false};
     this.history.push({id:this.active.id, option:option?.id, tick, timedOut:false});
-    this.active=this.queue.shift()||null;
+    const next=this.queue.shift();this.active=next?this.activate(next,tick):null;
     return result;
   }
   update(tick) {
@@ -19,7 +19,7 @@ export class DecisionSystem {
     const option=this.active.options.find(o=>o.id===this.active.defaultOption && !o.disabled) || this.active.options.find(o=>!o.disabled);
     const result={decision:this.active, option, tick, timedOut:true};
     this.history.push({id:this.active.id, option:option?.id, tick, timedOut:true});
-    this.active=this.queue.shift()||null;
+    const next=this.queue.shift();this.active=next?this.activate(next,tick):null;
     return result;
   }
 }
